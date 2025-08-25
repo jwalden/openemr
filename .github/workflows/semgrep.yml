@@ -1,0 +1,62 @@
+# .github/workflows/semgrep.yml
+name: Semgrep (PHP) ➜ Code scanning
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch: {}        # ← manual "Run workflow" button
+  schedule:
+    - cron: "0 3 * * *"        # ← nightly at 03:00 UTC
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write       # required to upload SARIF
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep and produce SARIF
+        uses: returntocorp/semgrep-action@v1
+        with:
+          # Curated PHP + OWASP rules
+          config: |
+            p/php
+            p/owasp-top-ten
+
+          # Write SARIF to workspace
+          generateSarif: true
+
+          # Exclude heavy/irrelevant paths (tailored for OpenEMR)
+          # Adjust if your tree differs.
+          exclude: |
+            vendor
+            node_modules
+            .git
+            .github
+            docker
+            docs
+            tests
+            coverage
+            build
+            dist
+            public/assets
+            assets/**/dist
+            **/templates_c
+            sites/*/documents
+            sites/*/cache
+            interface/**/cache
+            interface/**/templates_c
+            interface/**/assets/**/dist
+            interface/**/node_modules
+            interface/**/vendor
+
+      - name: Upload SARIF to Code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
